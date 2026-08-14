@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+  }
+}
+
+@layer components {
+  /* Card shadow halus */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-slate-100;
+  }
+
+  /* Input standar */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800
+           placeholder-slate-400 text-sm
+           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
+           transition-all duration-150;
+  }
+
+  /* Tombol primer */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl
+           bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800
+           text-white font-semibold text-sm
+           transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  /* Tombol bahaya */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg
+           bg-rose-50 hover:bg-rose-100 active:bg-rose-200
+           text-rose-600 font-medium text-xs
+           transition-all duration-150;
+  }
+
+  /* Tombol sekunder */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg
+           bg-slate-100 hover:bg-slate-200 active:bg-slate-300
+           text-slate-600 font-medium text-xs
+           transition-all duration-150;
+  }
+
+  /* Badge tipe transaksi */
+  .badge-in {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full
+           bg-emerald-50 text-emerald-700 text-xs font-semibold;
+  }
+
+  .badge-out {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full
+           bg-rose-50 text-rose-600 text-xs font-semibold;
+  }
+}
