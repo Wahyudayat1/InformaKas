@@ -18,8 +18,12 @@ function formatTanggal(dateStr) {
   });
 }
 
-// ─── Cetak PDF Rekap Keseluruhan ─────────────────────────────────
-function printRekap(transactions) {
+// ─── Download PDF Rekap Keseluruhan (jsPDF + html2canvas) ────────
+async function downloadRekapPDF(transactions) {
+  // Dynamic import agar bundle size lebih kecil
+  const jsPDF = (await import("jspdf")).default;
+  const html2canvas = (await import("html2canvas")).default;
+
   const formatRp = (n) => new Intl.NumberFormat("id-ID", {
     style: "currency", currency: "IDR", minimumFractionDigits: 0,
   }).format(Number(n) || 0);
@@ -32,117 +36,133 @@ function printRekap(transactions) {
   const totalKeluar = transactions.filter((t) => t.type === "keluar").reduce((s, t) => s + Number(t.amount), 0);
   const saldo = totalMasuk - totalKeluar;
 
-  const rows = transactions.map((t, i) => `
-    <tr class="${i % 2 === 0 ? "even" : ""}">
-      <td>${formatDate(t.date)}</td>
-      <td>${t.description}</td>
-      <td>${t.category || "—"}</td>
-      <td class="center">
-        <span class="badge ${t.type}">${t.type === "masuk" ? "Masuk" : "Keluar"}</span>
-      </td>
-      <td class="right ${t.type}">${t.type === "masuk" ? "+" : "−"}${formatRp(t.amount)}</td>
-    </tr>
-    ${t.transaction_items && t.transaction_items.length > 0
-      ? `<tr class="item-row">
-          <td colspan="5">
-            <div class="items-wrap">
-              ${t.transaction_items.map((it) =>
-                `<span class="item-tag">${it.product_name} × ${it.quantity} ${it.unit} @ ${formatRp(it.unit_price)}</span>`
-              ).join("")}
-            </div>
-          </td>
-        </tr>`
-      : ""
-    }`).join("");
-
-  const html = `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <title>Rekap Kas — Buku Kas Transparan</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Segoe UI',Arial,sans-serif; font-size:11px; color:#1e293b; background:white; }
-    .wrapper { max-width:900px; margin:0 auto; padding:28px 24px; }
-    .header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:16px; }
-    .logo { font-size:20px; font-weight:800; color:#059669; }
-    .logo-sub { font-size:11px; color:#64748b; margin-top:2px; }
-    .print-date { font-size:10px; color:#94a3b8; text-align:right; }
-    .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
-    .summary-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; }
-    .summary-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin-bottom:4px; }
-    .summary-value { font-size:16px; font-weight:800; }
-    .summary-value.saldo { color:#0f172a; }
-    .summary-value.masuk { color:#059669; }
-    .summary-value.keluar { color:#e11d48; }
-    table { width:100%; border-collapse:collapse; }
-    thead th { background:#f1f5f9; padding:7px 10px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#475569; border-bottom:2px solid #e2e8f0; }
-    th.right, td.right { text-align:right; }
-    th.center, td.center { text-align:center; }
-    tbody tr { border-bottom:1px solid #f1f5f9; }
-    tbody tr.even { background:#fafafa; }
-    tbody td { padding:6px 10px; vertical-align:middle; }
-    tbody tr.item-row td { padding:2px 10px 6px; }
-    .items-wrap { display:flex; flex-wrap:wrap; gap:4px; }
-    .item-tag { font-size:10px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:2px 6px; color:#475569; }
-    .badge { display:inline-block; font-size:9px; font-weight:700; padding:2px 7px; border-radius:20px; }
-    .badge.masuk { background:#d1fae5; color:#065f46; }
-    .badge.keluar { background:#ffe4e6; color:#9f1239; }
-    .right.masuk { color:#059669; font-weight:700; }
-    .right.keluar { color:#e11d48; font-weight:700; }
-    .footer { margin-top:20px; text-align:center; font-size:10px; color:#94a3b8; border-top:1px solid #e2e8f0; padding-top:12px; }
-    @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
-  </style>
-</head>
-<body>
-<div class="wrapper">
-  <div class="header">
-    <div>
-      <div class="logo">📒 Buku Kas Transparan</div>
-      <div class="logo-sub">Laporan Rekapitulasi Keuangan</div>
+  // Buat HTML konten yang akan di-render ke PDF
+  const container = document.createElement("div");
+  container.style.cssText = "position:absolute;left:-9999px;top:0;width:800px;background:white;padding:40px;font-family:Arial,sans-serif;";
+  
+  container.innerHTML = `
+    <div style="margin-bottom:24px;border-bottom:3px solid #e2e8f0;padding-bottom:20px;">
+      <div style="font-size:28px;font-weight:800;color:#059669;margin-bottom:6px;">📒 Buku Kas Transparan</div>
+      <div style="font-size:14px;color:#64748b;">Laporan Rekapitulasi Keuangan</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:8px;">
+        Dicetak: ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}<br>
+        Total ${transactions.length} transaksi
+      </div>
     </div>
-    <div class="print-date">
-      Dicetak:<br>${new Date().toLocaleString("id-ID")}<br>
-      Total ${transactions.length} transaksi
-    </div>
-  </div>
 
-  <div class="summary">
-    <div class="summary-card">
-      <div class="summary-label">Saldo Akhir</div>
-      <div class="summary-value saldo">${formatRp(saldo)}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+      <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;padding:16px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Saldo Akhir</div>
+        <div style="font-size:20px;font-weight:800;color:#0f172a;">${formatRp(saldo)}</div>
+      </div>
+      <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;padding:16px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Total Masuk</div>
+        <div style="font-size:20px;font-weight:800;color:#059669;">${formatRp(totalMasuk)}</div>
+      </div>
+      <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;padding:16px;">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px;">Total Keluar</div>
+        <div style="font-size:20px;font-weight:800;color:#e11d48;">${formatRp(totalKeluar)}</div>
+      </div>
     </div>
-    <div class="summary-card">
-      <div class="summary-label">Total Masuk</div>
-      <div class="summary-value masuk">${formatRp(totalMasuk)}</div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead>
+        <tr style="background:#f1f5f9;border-bottom:2px solid #e2e8f0;">
+          <th style="padding:10px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;">Tanggal</th>
+          <th style="padding:10px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;">Keterangan</th>
+          <th style="padding:10px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;">Kategori</th>
+          <th style="padding:10px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;">Tipe</th>
+          <th style="padding:10px;text-align:right;font-size:9px;font-weight:700;text-transform:uppercase;color:#475569;">Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${transactions.map((t, i) => `
+          <tr style="border-bottom:1px solid #f1f5f9;${i % 2 === 0 ? "background:#fafafa;" : ""}">
+            <td style="padding:10px;color:#475569;">${formatDate(t.date)}</td>
+            <td style="padding:10px;color:#1e293b;font-weight:600;">${t.description}${t.note ? `<br><span style="font-size:9px;color:#94a3b8;font-weight:400;">${t.note}</span>` : ""}</td>
+            <td style="padding:10px;color:#64748b;">${t.category || "—"}</td>
+            <td style="padding:10px;text-align:center;">
+              <span style="display:inline-block;font-size:9px;font-weight:700;padding:3px 10px;border-radius:12px;${t.type === "masuk" ? "background:#d1fae5;color:#065f46;" : "background:#ffe4e6;color:#9f1239;"}">${t.type === "masuk" ? "Masuk" : "Keluar"}</span>
+            </td>
+            <td style="padding:10px;text-align:right;font-weight:700;${t.type === "masuk" ? "color:#059669;" : "color:#e11d48;"}">
+              ${t.type === "masuk" ? "+" : "−"}${formatRp(t.amount)}
+            </td>
+          </tr>
+          ${t.transaction_items && t.transaction_items.length > 0 ? `
+            <tr>
+              <td colspan="5" style="padding:4px 10px 12px;">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  ${t.transaction_items.map((it) => 
+                    `<span style="font-size:9px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;color:#475569;">${it.product_name} × ${it.quantity} ${it.unit} @ ${formatRp(it.unit_price)}</span>`
+                  ).join("")}
+                </div>
+              </td>
+            </tr>
+          ` : ""}
+        `).join("")}
+      </tbody>
+    </table>
+
+    <div style="margin-top:28px;padding-top:16px;border-top:1px solid #e2e8f0;text-align:center;font-size:10px;color:#94a3b8;">
+      Laporan ini digenerate otomatis oleh sistem Buku Kas Transparan.
     </div>
-    <div class="summary-card">
-      <div class="summary-label">Total Keluar</div>
-      <div class="summary-value keluar">${formatRp(totalKeluar)}</div>
-    </div>
-  </div>
+  `;
 
-  <table>
-    <thead>
-      <tr>
-        <th style="width:110px">Tanggal</th>
-        <th>Keterangan</th>
-        <th style="width:100px">Kategori</th>
-        <th class="center" style="width:70px">Tipe</th>
-        <th class="right" style="width:130px">Jumlah</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
+  document.body.appendChild(container);
 
-  <div class="footer">Laporan ini digenerate otomatis oleh sistem Buku Kas Transparan.</div>
-</div>
-<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
-</body>
-</html>`;
+  try {
+    // Render HTML ke canvas
+    const canvas = await html2canvas(container, {
+      scale: 2, // Kualitas tinggi
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+    });
 
-  const w = window.open("", "_blank", "width=960,height=900");
-  if (w) { w.document.write(html); w.document.close(); }
+    document.body.removeChild(container);
+
+    // Convert canvas ke PDF
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const imgWidth = 210; // A4 width in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    // Jika tinggi konten lebih dari 1 halaman, buat multi-page
+    const pageHeight = 297; // A4 height in mm
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    // Generate nama file dengan timestamp
+    const timestamp = new Date().toLocaleDateString("id-ID", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).replace(/\//g, "-");
+    
+    const fileName = `Rekap-Kas-Keuangan-${timestamp}.pdf`;
+
+    // Download PDF
+    pdf.save(fileName);
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    document.body.removeChild(container);
+    alert("Gagal membuat PDF. Silakan coba lagi.");
+  }
 }
 
 // ─── Modal konfirmasi hapus ──────────────────────────────────────
@@ -562,7 +582,7 @@ export default function AdminPage() {
         {/* Tombol export rekap PDF */}
         <div className="flex justify-end">
           <button
-            onClick={() => printRekap(transactions)}
+            onClick={() => downloadRekapPDF(transactions)}
             disabled={transactions.length === 0}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >

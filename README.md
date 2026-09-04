@@ -21,6 +21,7 @@ Aplikasi pencatatan keuangan berbasis web yang transparan dan dapat diakses publ
 - **Uang Keluar:** Detail item produk (nama, qty, satuan, harga satuan)
 - **CRUD Lengkap:** Create, Read, Update, Delete transaksi
 - **Cetak Struk:** PDF per transaksi setelah simpan
+- **Export Rekap PDF:** Download rekap keseluruhan dengan format `Rekap-Kas-Keuangan-DD-MM-YYYY.pdf` (langsung download tanpa dialog print browser)
 - **Real-time Update:** Data langsung muncul di halaman publik
 
 ---
@@ -195,13 +196,13 @@ File `globals.css` berisi utility classes:
 ## 📸 Screenshots
 
 ### Halaman Publik
-Ringkasan saldo + tabel transaksi dengan detail item produk
+Ringkasan saldo + tabel transaksi dengan detail item produk, tombol export rekap PDF
 
 ### Panel Admin
-Form adaptif: input manual untuk uang masuk, detail item untuk uang keluar
+Form adaptif: input manual untuk uang masuk, detail item untuk uang keluar. Export rekap langsung download PDF dengan nama file timestamp.
 
 ### Cetak PDF
-Struk transaksi profesional siap print
+Rekap keuangan profesional dengan multi-page support, auto-download tanpa dialog print browser
 
 ---
 
