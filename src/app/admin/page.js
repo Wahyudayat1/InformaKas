@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseClient } from "@/lib/supabase";
 import TransactionForm, { printStruk } from "./TransactionForm";
+import { revalidatePublicPage } from "@/app/actions/revalidate";
 
 // ─── Helpers ────────────────────────────────────────────────────
 function formatRupiah(amount) {
@@ -450,6 +451,10 @@ export default function AdminPage() {
       .eq("transaction_id", tx.id);
 
     await fetchTransactions();
+    
+    // 🔄 Revalidate halaman publik agar cache di Next.js/Vercel diperbarui
+    await revalidatePublicPage();
+    
     showToast("Transaksi berhasil ditambahkan!");
     return { transaction: tx, items: savedItems || [] };
   }
@@ -479,6 +484,10 @@ export default function AdminPage() {
       .from("transaction_items").select("*").eq("transaction_id", txId);
 
     await fetchTransactions();
+    
+    // 🔄 Revalidate halaman publik agar cache di Next.js/Vercel diperbarui
+    await revalidatePublicPage();
+    
     setEditingData(null);
     setEditingItems([]);
     showToast("Transaksi berhasil diperbarui!");
@@ -495,6 +504,10 @@ export default function AdminPage() {
     if (error) showToast("Gagal menghapus transaksi.", "error");
     else {
       setTransactions((prev) => prev.filter((t) => t.id !== deleteTarget.id));
+      
+      // 🔄 Revalidate halaman publik agar cache di Next.js/Vercel diperbarui
+      await revalidatePublicPage();
+      
       showToast("Transaksi berhasil dihapus.");
     }
     setDeleteTarget(null);

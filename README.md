@@ -12,6 +12,7 @@ Aplikasi pencatatan keuangan berbasis web yang transparan dan dapat diakses publ
 
 ### 🌐 Halaman Publik (Read-Only)
 - **Ringkasan Keuangan:** Saldo, total pemasukan, total pengeluaran
+- **🔄 Real-time Sync:** Data otomatis update tanpa refresh manual (Supabase Realtime)
 - **Riwayat Transaksi:** Tabel lengkap dengan detail item produk
 - **Cetak PDF:** Export rekap keseluruhan
 - **Responsive:** Mobile-first design
@@ -22,7 +23,7 @@ Aplikasi pencatatan keuangan berbasis web yang transparan dan dapat diakses publ
 - **CRUD Lengkap:** Create, Read, Update, Delete transaksi
 - **Cetak Struk:** PDF per transaksi setelah simpan
 - **Export Rekap PDF:** Download rekap keseluruhan dengan format `Rekap-Kas-Keuangan-DD-MM-YYYY.pdf` (langsung download tanpa dialog print browser)
-- **Real-time Update:** Data langsung muncul di halaman publik
+- **🔄 Cache Revalidation:** Server Action otomatis clear Next.js/Vercel cache setelah CRUD
 
 ---
 
@@ -67,7 +68,18 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-### 5. Run Development Server
+### 5. Enable Supabase Realtime
+
+**⚠️ PENTING:** Supabase Realtime TIDAK aktif secara default!
+
+1. Buka **Supabase Dashboard** → **Database** → **Replication**
+2. Cari tabel **`transactions`**
+3. Toggle **"Enable Realtime"** menjadi **ON**
+4. Save changes
+
+**📖 Lihat panduan lengkap:** [ENABLE_REALTIME_SUPABASE.md](./ENABLE_REALTIME_SUPABASE.md)
+
+### 6. Run Development Server
 
 ```bash
 npm run dev
@@ -82,20 +94,57 @@ Buka [http://localhost:3000](http://localhost:3000)
 ```
 ├── src/
 │   ├── app/
-│   │   ├── page.js              # Halaman publik (Server Component)
+│   │   ├── page.js              # Halaman publik (Client Component + Realtime)
 │   │   ├── layout.js            # Root layout + navbar
 │   │   ├── globals.css          # Tailwind + custom styles
+│   │   ├── actions/
+│   │   │   └── revalidate.js    # Server Action untuk cache revalidation
 │   │   ├── login/
 │   │   │   └── page.js          # Form login
 │   │   └── admin/
-│   │       ├── page.js          # Panel admin CRUD
+│   │       ├── page.js          # Panel admin CRUD + revalidation
 │   │       └── TransactionForm.js  # Form transaksi
 │   └── lib/
 │       └── supabase.js          # Supabase client helper
 ├── middleware.js                 # Route protection
 ├── supabase-schema.sql          # Database schema + RLS policies
+├── ENABLE_REALTIME_SUPABASE.md  # Panduan enable Realtime
 └── package.json
 ```
+
+---
+
+## 🔄 Real-time Synchronization
+
+Aplikasi menggunakan **dual-strategy** untuk memastikan data selalu sinkron:
+
+### 1. Server Action + Revalidation (Next.js Cache)
+Setiap operasi CRUD di admin memanggil `revalidatePublicPage()`:
+- Clear cache Next.js/Vercel di path `/`
+- Memastikan user yang fresh load dapat data terbaru
+- Bekerja optimal di production (Vercel)
+
+**File:** `src/app/actions/revalidate.js`
+
+### 2. Supabase Realtime (Live Updates)
+Halaman publik subscribe ke perubahan database real-time:
+- Listen event `INSERT`, `UPDATE`, `DELETE` di tabel `transactions`
+- Auto re-fetch data saat ada perubahan
+- Update React state tanpa manual refresh
+
+**File:** `src/app/page.js` (Client Component)
+
+### Cara Test Real-time Sync:
+
+1. **Buka 2 tab browser:**
+   - Tab 1: `http://localhost:3000` (Halaman Publik)
+   - Tab 2: `http://localhost:3000/admin` (Panel Admin)
+
+2. **Di tab Admin:** Tambah/edit/hapus transaksi
+
+3. **Di tab Publik:** Data **langsung update otomatis** tanpa refresh! ⚡
+
+**⚠️ NOTE:** Pastikan Realtime sudah enabled di Supabase (lihat [ENABLE_REALTIME_SUPABASE.md](./ENABLE_REALTIME_SUPABASE.md))
 
 ---
 
